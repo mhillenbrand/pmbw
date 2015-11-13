@@ -57,6 +57,9 @@ double g_avg_time = 1.5;
 // filter of functions to run, set by command line
 std::vector<const char*> gopt_funcfilter;
 
+// match any or all filters on functions to run, set by command line
+int match_all = 0;
+
 // set default size limit: 0 -- 4 GiB
 uint64_t gopt_sizelimit_min = 0;
 uint64_t gopt_sizelimit_max = 4*1024*1024*1024LLU;
@@ -286,13 +289,25 @@ static inline bool match_funcfilter(const char* funcname)
 {
     if (gopt_funcfilter.size() == 0) return true;
 
-    // iterate over gopt_funcfilter list
-    for (size_t i = 0; i < gopt_funcfilter.size(); ++i) {
-        if (strstr(funcname, gopt_funcfilter[i]) != NULL)
-            return true;
-    }
+    if (match_all) {
+        // iterate over gopt_funcfilter list
+        for (size_t i = 0; i < gopt_funcfilter.size(); ++i) {
+            if (strstr(funcname, gopt_funcfilter[i]) == NULL)
+                return false;
+        }
 
-    return false;
+        return true;
+
+    } else {
+        // default behavior: match any filter
+        // iterate over gopt_funcfilter list
+        for (size_t i = 0; i < gopt_funcfilter.size(); ++i) {
+            if (strstr(funcname, gopt_funcfilter[i]) != NULL)
+                return true;
+        }
+
+        return false;
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -673,6 +688,7 @@ void print_usage(const char* prog)
     ERR("Usage: " << prog << " [options]" << std::endl
         << "Options:" << std::endl
         << "  -f <match>     Run only benchmarks containing this substring, can be used multile times. Try \"list\"." << std::endl
+	<< "  -a             Run only benchmarks containing *all* substrings given with -f (default: any)." << std::endl
         << "  -M <size>      Limit the maximum amount of memory allocated at startup [byte]." << std::endl
         << "  -o <file>      Write the results to <file> instead of stats.txt." << std::endl
         << "  -p <nthrs>     Run benchmarks with at least this thread count." << std::endl
@@ -689,7 +705,7 @@ int main(int argc, char* argv[])
 
     int opt;
 
-    while ( (opt = getopt(argc, argv, "hf:M:o:p:P:Qs:S:")) != -1 )
+    while ( (opt = getopt(argc, argv, "hf:aM:o:p:P:Qs:S:")) != -1 )
     {
         switch (opt) {
         default:
@@ -717,6 +733,10 @@ int main(int argc, char* argv[])
             gopt_funcfilter.push_back(optarg);
 
             ERR("Running only functions containing '" << optarg << "'");
+            break;
+
+        case 'a':
+            match_all = 1;
             break;
 
         case 'M':
